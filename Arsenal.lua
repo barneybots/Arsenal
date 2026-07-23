@@ -1,4 +1,4 @@
--- B arney HUB | Arsenal v5
+-- B arney HUB | Arsenal v6
 -- loadstring(game:HttpGet("https://raw.githubusercontent.com/barneybots/Arsenal/main/Arsenal.lua"))()
 
 local globalEnv = (getgenv and getgenv()) or _G
@@ -10,10 +10,8 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Lighting = game:GetService("Lighting")
 local TeleportService = game:GetService("TeleportService")
-local HttpService = game:GetService("HttpService")
 local CoreGui = game:GetService("CoreGui")
 local Workspace = game:GetService("Workspace")
 local VirtualInputManager = nil
@@ -25,7 +23,6 @@ local localPlayer = Players.LocalPlayer
 local camera = Workspace.CurrentCamera
 local connections = {}
 local espObjects = {}
-local weaponOriginals = {}
 local humanoidOriginals = setmetatable({}, {__mode = "k"})
 local noclipOriginals = setmetatable({}, {__mode = "k"})
 local destroyed = false
@@ -48,12 +45,6 @@ local defaultState = {
     espDistance = true,
     espTeammates = false,
 
-    noRecoil = false,
-    noSpread = false,
-    infiniteAmmo = false,
-    fastReload = false,
-    automatic = false,
-
     speedEnabled = false,
     walkSpeed = 32,
     infiniteJump = false,
@@ -68,76 +59,12 @@ for key, value in pairs(defaultState) do
     state[key] = value
 end
 
-local configFile = "BarneyHub_Arsenal.json"
-local configVersion = 2
-local configLoaded = false
-local configSaveToken = 0
-
-local function canUseFiles()
-    return type(writefile) == "function"
-        and type(readfile) == "function"
-        and type(isfile) == "function"
-end
-
-local function saveConfig()
-    if not canUseFiles() then
-        return false, "Executor sem suporte a arquivos"
+pcall(function()
+    if type(isfile) == "function" and type(delfile) == "function"
+        and isfile("BarneyHub_Arsenal.json") then
+        delfile("BarneyHub_Arsenal.json")
     end
-    local ok, message = pcall(function()
-        local savedState = {}
-        for key in pairs(defaultState) do
-            savedState[key] = state[key]
-        end
-        writefile(configFile, HttpService:JSONEncode({
-            version = configVersion,
-            settings = savedState,
-        }))
-    end)
-    return ok, ok and "Configuracao salva" or tostring(message)
-end
-
-local function scheduleConfigSave()
-    configSaveToken = configSaveToken + 1
-    local token = configSaveToken
-    task.delay(0.75, function()
-        if not destroyed and token == configSaveToken then
-            saveConfig()
-        end
-    end)
-end
-
-local function loadConfig()
-    if not canUseFiles() or not isfile(configFile) then
-        return false
-    end
-    local ok = pcall(function()
-        local decoded = HttpService:JSONDecode(readfile(configFile))
-        local settings = decoded and decoded.settings
-        if type(settings) ~= "table" then
-            return
-        end
-        for key, defaultValue in pairs(defaultState) do
-            local savedValue = settings[key]
-            if typeof(savedValue) == typeof(defaultValue) then
-                state[key] = savedValue
-            end
-        end
-        if decoded.version ~= configVersion then
-            state.aimSmoothness = defaultState.aimSmoothness
-            state.fastReload = false
-        end
-        state.aimFov = math.clamp(state.aimFov, 40, 400)
-        state.aimSmoothness = math.clamp(state.aimSmoothness, 1, 20)
-        state.walkSpeed = math.clamp(state.walkSpeed, 16, 80)
-        if not table.find({"Head", "UpperTorso", "HumanoidRootPart"}, state.aimPart) then
-            state.aimPart = defaultState.aimPart
-        end
-        configLoaded = true
-    end)
-    return ok and configLoaded
-end
-
-loadConfig()
+end)
 
 local colors = {
     background = Color3.fromRGB(13, 15, 19),
@@ -260,7 +187,7 @@ local subtitle = Instance.new("TextLabel")
 subtitle.Size = UDim2.new(1, -110, 0, 15)
 subtitle.Position = UDim2.fromOffset(16, 27)
 subtitle.BackgroundTransparency = 1
-subtitle.Text = "PRIVATE BUILD  |  V5 PERFORMANCE MODE"
+subtitle.Text = "PRIVATE BUILD  |  V6 SAFE WEAPONS"
 subtitle.TextColor3 = colors.accent2
 subtitle.Font = Enum.Font.Code
 subtitle.TextSize = 10
@@ -380,7 +307,6 @@ corner(crosshairVertical, 2)
 local tabs = {}
 local activeTab = nil
 local statusToken = 0
-local weaponToggleRenders = {}
 
 local function setStatus(text, color)
     statusToken = statusToken + 1
@@ -550,7 +476,6 @@ local function addToggle(page, text, description, key, callback)
         if callback then
             callback(state[key])
         end
-        scheduleConfigSave()
     end)
 
     return render
@@ -613,7 +538,6 @@ local function addSlider(page, text, key, minimum, maximum, step, suffix, callba
         if callback then
             callback(value)
         end
-        scheduleConfigSave()
     end
 
     renderValue(state[key])
@@ -675,7 +599,6 @@ local function addCycle(page, text, key, options)
         index = (index % #options) + 1
         state[key] = options[index]
         button.Text = state[key]
-        scheduleConfigSave()
     end)
 end
 
@@ -906,146 +829,6 @@ local function updateEsp()
     end
 end
 
-local weaponRules = {
-    noRecoil = {
-        recoilcontrol = 0,
-        recoil = 0,
-    },
-    noSpread = {
-        spread = 0,
-        maxspread = 0,
-    },
-    infiniteAmmo = {
-        ammo = 300,
-        storedammo = 300,
-    },
-    fastReload = {
-        reloadtime = function(original)
-            if type(original) ~= "number" then
-                return nil
-            end
-            return math.max(original * 0.65, 0.45)
-        end,
-    },
-    automatic = {
-        auto = true,
-        automatic = true,
-    },
-}
-
-local function updateLiveAmmo()
-    if not state.infiniteAmmo then
-        return
-    end
-    local playerGui = localPlayer:FindFirstChildOfClass("PlayerGui")
-    local arsenalGui = playerGui and playerGui:FindFirstChild("GUI")
-    local client = arsenalGui and arsenalGui:FindFirstChild("Client")
-    local variables = client and client:FindFirstChild("Variables")
-    if not variables then
-        return
-    end
-    for _, name in ipairs({"ammocount", "ammocount2"}) do
-        local ammo = variables:FindFirstChild(name)
-        if ammo and ammo:IsA("ValueBase") then
-            pcall(function()
-                ammo.Value = 300
-            end)
-        end
-    end
-end
-
-local function rememberWeaponValue(instance)
-    if weaponOriginals[instance] == nil then
-        weaponOriginals[instance] = instance.Value
-    end
-end
-
-local function getWeaponOverride(instance)
-    if not instance:IsA("ValueBase") then
-        return nil
-    end
-    local normalizedName = string.lower(instance.Name)
-    for key, rules in pairs(weaponRules) do
-        local newValue = state[key] and rules[normalizedName]
-        if newValue ~= nil then
-            if type(newValue) == "function" then
-                return newValue(weaponOriginals[instance] or instance.Value)
-            end
-            return newValue
-        end
-    end
-    return nil
-end
-
-local function applyWeaponInstance(instance)
-    local newValue = getWeaponOverride(instance)
-    if newValue == nil then
-        return
-    end
-    rememberWeaponValue(instance)
-    pcall(function()
-        instance.Value = newValue
-    end)
-end
-
-local function restoreInactiveWeaponMods()
-    for instance, original in pairs(weaponOriginals) do
-        if not instance.Parent or getWeaponOverride(instance) == nil then
-            if instance.Parent then
-                pcall(function()
-                    instance.Value = original
-                end)
-            end
-            weaponOriginals[instance] = nil
-        end
-    end
-end
-
-local function getWeaponFolder()
-    local names = {"Weapons", "weapons", "Guns", "guns", "Modules", "Data"}
-    for _, name in ipairs(names) do
-        local folder = ReplicatedStorage:FindFirstChild(name)
-        if folder then
-            local hasValues = false
-            for _, v in pairs(folder:GetDescendants()) do
-                local valueName = string.lower(v.Name)
-                if v:IsA("ValueBase")
-                    and (valueName:find("recoil") or valueName:find("spread")
-                        or valueName:find("ammo") or valueName:find("reload")) then
-                    hasValues = true
-                    break
-                end
-            end
-            if hasValues then return folder end
-        end
-    end
-    return nil
-end
-
-local function applyWeaponMods()
-    local weapons = getWeaponFolder()
-    if not weapons then
-        return false
-    end
-
-    restoreInactiveWeaponMods()
-    for _, instance in ipairs(weapons:GetDescendants()) do
-        applyWeaponInstance(instance)
-    end
-    return true
-end
-
-local function restoreWeaponMods()
-    for instance, original in pairs(weaponOriginals) do
-        if instance and instance.Parent then
-            pcall(function()
-                instance.Value = original
-            end)
-        end
-    end
-    table.clear(weaponOriginals)
-end
-
 local lightingOriginal = nil
 
 local function applyFullBright()
@@ -1112,10 +895,8 @@ cleanup = function()
     if destroyed then
         return
     end
-    saveConfig()
     destroyed = true
     clearEsp()
-    restoreWeaponMods()
     restoreHumanoids()
     restoreNoclip()
     state.fullBright = false
@@ -1160,32 +941,7 @@ addSection(visualPage, "Tela")
 addToggle(visualPage, "Crosshair", nil, "crosshair")
 addToggle(visualPage, "Fullbright", "Melhora a visibilidade em areas escuras", "fullBright", applyFullBright)
 
-local combatPage = createTab("WEAPONS", 3)
-addSection(combatPage, "Modificadores do Arsenal")
-local function onWeaponToggle()
-    if applyWeaponMods() then
-        setStatus("Modificadores de arma atualizados", colors.team)
-    else
-        setStatus("Pasta Weapons nao encontrada nesta partida", colors.enemy)
-    end
-end
-weaponToggleRenders.noRecoil = addToggle(
-    combatPage, "Sem recoil", "Altera RecoilControl nas armas carregadas", "noRecoil", onWeaponToggle
-)
-weaponToggleRenders.noSpread = addToggle(
-    combatPage, "Sem spread", "Remove Spread e MaxSpread", "noSpread", onWeaponToggle
-)
-weaponToggleRenders.infiniteAmmo = addToggle(
-    combatPage, "Municao ampliada", "Define Ammo e StoredAmmo como 300", "infiniteAmmo", onWeaponToggle
-)
-weaponToggleRenders.fastReload = addToggle(
-    combatPage, "Recarga rapida", "Reduz os tempos de recarga e equipagem", "fastReload", onWeaponToggle
-)
-weaponToggleRenders.automatic = addToggle(
-    combatPage, "Todas automaticas", "Ativa Auto quando a arma oferece suporte", "automatic", onWeaponToggle
-)
-
-local playerPage = createTab("PLAYER", 4)
+local playerPage = createTab("PLAYER", 3)
 addSection(playerPage, "Movimento")
 addToggle(playerPage, "Velocidade personalizada", "Restaura o valor original ao desligar", "speedEnabled", function(enabled)
     if not enabled then
@@ -1201,29 +957,11 @@ addToggle(playerPage, "Noclip", "Atravessa paredes e restaura colisoes ao deslig
 end)
 addToggle(playerPage, "Trigger Bot", "Atira automaticamente quando o inimigo esta na mira", "triggerBot")
 
-local configPage = createTab("CONFIG", 5)
-addSection(configPage, "Configuracao local - auto save")
-addButton(configPage, "Salvar configuracao agora", function()
-    local ok, message = saveConfig()
-    setStatus(message, ok and colors.team or colors.enemy)
-end)
-addSection(configPage, "Sessao")
+local configPage = createTab("CONFIG", 4)
+addSection(configPage, "Sessao - configuracoes nao sao salvas")
 addButton(configPage, "Reentrar no servidor", function()
     setStatus("Reentrando no servidor...", colors.accent2)
     TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, localPlayer)
-end)
-addButton(configPage, "Restaurar armas", function()
-    state.noRecoil = false
-    state.noSpread = false
-    state.infiniteAmmo = false
-    state.fastReload = false
-    state.automatic = false
-    restoreWeaponMods()
-    for _, render in pairs(weaponToggleRenders) do
-        render()
-    end
-    scheduleConfigSave()
-    setStatus("Valores originais das armas restaurados", colors.team)
 end)
 addButton(configPage, "Encerrar hub", cleanup, true)
 
@@ -1311,40 +1049,6 @@ end)
 connect(Players.PlayerRemoving, destroyEsp)
 connect(localPlayer.OnTeleport, cleanup)
 
-local function hasActiveWeaponMod()
-    return state.noRecoil or state.noSpread or state.infiniteAmmo
-        or state.fastReload or state.automatic
-end
-
-local function watchWeaponFolder(folder)
-    if not folder then return end
-    connect(folder.DescendantAdded, function(instance)
-        if hasActiveWeaponMod() then
-            task.defer(applyWeaponInstance, instance)
-        end
-    end)
-end
-
-local watchedWeapons = getWeaponFolder()
-if watchedWeapons then
-    watchWeaponFolder(watchedWeapons)
-end
-connect(ReplicatedStorage.ChildAdded, function(instance)
-    if instance:IsA("Folder") then
-        local folder = getWeaponFolder()
-        if folder and folder ~= watchedWeapons then
-            watchedWeapons = folder
-            watchWeaponFolder(folder)
-            if hasActiveWeaponMod() then
-                task.defer(applyWeaponMods)
-            end
-        end
-    end
-end)
-
-if hasActiveWeaponMod() then
-    task.defer(applyWeaponMods)
-end
 if state.fullBright then
     applyFullBright()
 end
@@ -1482,7 +1186,6 @@ connect(RunService.RenderStepped, function(deltaTime)
     if espElapsed >= 0.2 then
         espElapsed = 0
         updateEsp()
-        updateLiveAmmo()
     end
 
     if fpsElapsed >= 0.75 then
@@ -1497,11 +1200,5 @@ connect(RunService.RenderStepped, function(deltaTime)
     end
 end)
 
-if configLoaded then
-    setStatus("Config carregada | 0 ou RightCtrl para ocultar", colors.team)
-elseif canUseFiles() then
-    setStatus("Auto-save ativo | 0 ou RightCtrl para ocultar", colors.team)
-else
-    setStatus("Config local indisponivel neste executor", colors.enemy)
-end
-print("B arney HUB | Arsenal v5 loaded")
+setStatus("Sem auto-save | armas nao sao modificadas | 0 ou RightCtrl", colors.team)
+print("B arney HUB | Arsenal v6 loaded")
