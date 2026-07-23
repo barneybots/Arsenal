@@ -1,4 +1,4 @@
--- B arney HUB | Arsenal v10 SAFE
+-- B arney HUB | Arsenal v11 SAFE
 -- loadstring(game:HttpGet("https://raw.githubusercontent.com/barneybots/Arsenal/main/Arsenal.lua"))()
 
 local globalEnv = (getgenv and getgenv()) or _G
@@ -129,8 +129,8 @@ gui.Parent = getGuiParent()
 
 local main = Instance.new("Frame")
 main.Name = "Main"
-main.Size = UDim2.fromOffset(700, 440)
-main.Position = UDim2.new(0.5, -350, 0.5, -220)
+main.Size = UDim2.fromOffset(590, 410)
+main.Position = UDim2.new(0.5, -295, 0.5, -205)
 main.BackgroundColor3 = colors.background
 main.BorderSizePixel = 0
 main.ClipsDescendants = true
@@ -145,13 +145,6 @@ topbar.BackgroundColor3 = colors.panel
 topbar.BorderSizePixel = 0
 topbar.Active = true
 topbar.Parent = main
-local topbarGradient = Instance.new("UIGradient")
-topbarGradient.Color = ColorSequence.new(
-    Color3.fromRGB(22, 25, 38),
-    Color3.fromRGB(15, 18, 27)
-)
-topbarGradient.Rotation = 90
-topbarGradient.Parent = topbar
 
 local accentLine = Instance.new("Frame")
 accentLine.Size = UDim2.new(1, 0, 0, 2)
@@ -159,9 +152,6 @@ accentLine.Position = UDim2.new(0, 0, 1, -2)
 accentLine.BackgroundColor3 = colors.accent
 accentLine.BorderSizePixel = 0
 accentLine.Parent = topbar
-local accentGradient = Instance.new("UIGradient")
-accentGradient.Color = ColorSequence.new(colors.accent, colors.accent2)
-accentGradient.Parent = accentLine
 
 local brand = Instance.new("TextLabel")
 brand.Size = UDim2.new(1, -110, 0, 22)
@@ -178,40 +168,12 @@ local subtitle = Instance.new("TextLabel")
 subtitle.Size = UDim2.new(1, -110, 0, 15)
 subtitle.Position = UDim2.fromOffset(16, 27)
 subtitle.BackgroundTransparency = 1
-subtitle.Text = "PRIVATE BUILD  |  V10 AIM RESTORED"
+subtitle.Text = "PRIVATE BUILD  |  V11 STABLE"
 subtitle.TextColor3 = colors.accent2
 subtitle.Font = Enum.Font.Code
 subtitle.TextSize = 10
 subtitle.TextXAlignment = Enum.TextXAlignment.Left
 subtitle.Parent = topbar
-
-local profileBadge = Instance.new("Frame")
-profileBadge.Size = UDim2.fromOffset(102, 28)
-profileBadge.Position = UDim2.new(1, -182, 0, 10)
-profileBadge.BackgroundColor3 = colors.card
-profileBadge.BorderSizePixel = 0
-profileBadge.Parent = topbar
-corner(profileBadge, 3)
-stroke(profileBadge, colors.off, 0.25)
-
-local profileDot = Instance.new("Frame")
-profileDot.Size = UDim2.fromOffset(7, 7)
-profileDot.Position = UDim2.fromOffset(10, 11)
-profileDot.BackgroundColor3 = colors.accent2
-profileDot.BorderSizePixel = 0
-profileDot.Parent = profileBadge
-corner(profileDot, 4)
-
-local profileText = Instance.new("TextLabel")
-profileText.Size = UDim2.new(1, -27, 1, 0)
-profileText.Position = UDim2.fromOffset(23, 0)
-profileText.BackgroundTransparency = 1
-profileText.Text = "barney / active"
-profileText.TextColor3 = colors.text
-profileText.Font = Enum.Font.Code
-profileText.TextSize = 10
-profileText.TextXAlignment = Enum.TextXAlignment.Left
-profileText.Parent = profileBadge
 
 local minimizeButton = Instance.new("TextButton")
 minimizeButton.Size = UDim2.fromOffset(32, 28)
@@ -240,7 +202,7 @@ corner(closeButton, 3)
 stroke(closeButton, colors.off, 0.25)
 
 local sidebar = Instance.new("Frame")
-sidebar.Size = UDim2.new(0, 154, 1, -76)
+sidebar.Size = UDim2.new(0, 144, 1, -76)
 sidebar.Position = UDim2.fromOffset(0, 48)
 sidebar.BackgroundColor3 = colors.panel
 sidebar.BorderSizePixel = 0
@@ -256,20 +218,9 @@ local tabPadding = Instance.new("UIPadding")
 tabPadding.PaddingTop = UDim.new(0, 12)
 tabPadding.Parent = sidebar
 
-local navigationTitle = Instance.new("TextLabel")
-navigationTitle.Size = UDim2.new(1, -20, 0, 24)
-navigationTitle.BackgroundTransparency = 1
-navigationTitle.Text = "  MODULES"
-navigationTitle.TextColor3 = colors.accent2
-navigationTitle.Font = Enum.Font.Code
-navigationTitle.TextSize = 11
-navigationTitle.TextXAlignment = Enum.TextXAlignment.Left
-navigationTitle.LayoutOrder = -1
-navigationTitle.Parent = sidebar
-
 local content = Instance.new("Frame")
-content.Size = UDim2.new(1, -154, 1, -76)
-content.Position = UDim2.fromOffset(154, 48)
+content.Size = UDim2.new(1, -144, 1, -76)
+content.Position = UDim2.fromOffset(144, 48)
 content.BackgroundColor3 = colors.background
 content.BorderSizePixel = 0
 content.Parent = main
@@ -394,53 +345,34 @@ local function createTab(name, order)
     buttonPadding.PaddingLeft = UDim.new(0, 12)
     buttonPadding.Parent = button
 
-    local page = Instance.new("Frame")
+    local page = Instance.new("ScrollingFrame")
     page.Name = name .. "Page"
     page.Size = UDim2.new(1, -16, 1, -14)
     page.Position = UDim2.fromOffset(8, 7)
     page.BackgroundTransparency = 1
     page.BorderSizePixel = 0
+    page.ScrollBarThickness = 3
+    page.ScrollBarImageColor3 = colors.accent
+    page.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    page.CanvasSize = UDim2.new()
     page.Visible = false
     page.Parent = content
 
-    local function createColumn(position)
-        local column = Instance.new("ScrollingFrame")
-        column.Size = UDim2.new(0.5, -5, 1, 0)
-        column.Position = UDim2.new(position, position == 0 and 0 or 5, 0, 0)
-        column.BackgroundColor3 = colors.panel
-        column.BackgroundTransparency = 0.3
-        column.BorderSizePixel = 0
-        column.ScrollBarThickness = 2
-        column.ScrollBarImageColor3 = colors.accent
-        column.AutomaticCanvasSize = Enum.AutomaticSize.Y
-        column.CanvasSize = UDim2.new()
-        column.Parent = page
-        corner(column, 3)
-        stroke(column, colors.off, 0.55)
+    local layout = Instance.new("UIListLayout")
+    layout.Padding = UDim.new(0, 7)
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    layout.Parent = page
 
-        local layout = Instance.new("UIListLayout")
-        layout.Padding = UDim.new(0, 7)
-        layout.SortOrder = Enum.SortOrder.LayoutOrder
-        layout.Parent = column
-
-        local padding = Instance.new("UIPadding")
-        padding.PaddingTop = UDim.new(0, 8)
-        padding.PaddingLeft = UDim.new(0, 7)
-        padding.PaddingRight = UDim.new(0, 3)
-        padding.PaddingBottom = UDim.new(0, 8)
-        padding.Parent = column
-        return column
-    end
-
-    local leftColumn = createColumn(0)
-    local rightColumn = createColumn(0.5)
+    local padding = Instance.new("UIPadding")
+    padding.PaddingBottom = UDim.new(0, 8)
+    padding.Parent = page
 
     tabs[name] = {button = button, page = page, indicator = indicator}
     connect(button.MouseButton1Click, function()
         selectTab(name)
     end)
 
-    return {left = leftColumn, right = rightColumn}
+    return page
 end
 
 local function addSection(page, text)
@@ -1014,55 +946,52 @@ globalEnv.__BARNEY_ARSENAL_RUNTIME = {
 }
 
 local aimPage = createTab("AIMBOT", 1)
-addSection(aimPage.left, "Assistencia de mira")
-addToggle(aimPage.left, "Aim Assist", "Alvo mais proximo dentro do FOV", "aimEnabled", function(enabled)
+addSection(aimPage, "Assistencia de mira")
+addToggle(aimPage, "Aim Assist", "Alvo mais proximo dentro do FOV", "aimEnabled", function(enabled)
     setStatus(enabled and "AIM ASSIST: ENABLED" or "AIM ASSIST: DISABLED",
         enabled and colors.accent2 or colors.muted)
 end)
-addToggle(aimPage.left, "Segurar botao direito", "Ativa somente enquanto pressionado", "aimOnRightMouse")
-addSlider(aimPage.left, "FOV", "aimFov", 40, 400, 5, "px")
-addSlider(aimPage.left, "Suavidade (1 = forte)", "aimSmoothness", 1, 20, 1, "")
-addSection(aimPage.right, "Selecao de alvo")
-addCycle(aimPage.right, "Hitbox", "aimPart", {"Head", "UpperTorso", "HumanoidRootPart"})
-addToggle(aimPage.right, "Checar equipe", nil, "teamCheck", updateEsp)
-addToggle(aimPage.right, "Checar paredes", nil, "wallCheck")
-addToggle(aimPage.right, "Mostrar circulo FOV", nil, "showFov")
+addToggle(aimPage, "Segurar botao direito", "Ativa somente enquanto pressionado", "aimOnRightMouse")
+addSlider(aimPage, "FOV", "aimFov", 40, 400, 5, "px")
+addSlider(aimPage, "Suavidade (1 = forte)", "aimSmoothness", 1, 20, 1, "")
+addCycle(aimPage, "Hitbox", "aimPart", {"Head", "UpperTorso", "HumanoidRootPart"})
+addToggle(aimPage, "Checar equipe", nil, "teamCheck", updateEsp)
+addToggle(aimPage, "Checar paredes", nil, "wallCheck")
+addToggle(aimPage, "Mostrar circulo FOV", nil, "showFov")
 
 local visualPage = createTab("VISUALS", 2)
-addSection(visualPage.left, "Player ESP")
-addToggle(visualPage.left, "ESP de jogadores", "Highlight persistente e leve", "espEnabled", updateEsp)
-addToggle(visualPage.left, "Mostrar nomes", nil, "espNames", updateEsp)
-addToggle(visualPage.left, "Mostrar vida", nil, "espHealth", updateEsp)
-addToggle(visualPage.left, "Mostrar distancia", nil, "espDistance", updateEsp)
-addSection(visualPage.right, "World & Overlay")
-addToggle(visualPage.right, "Mostrar aliados", nil, "espTeammates", updateEsp)
-addToggle(visualPage.right, "Crosshair", nil, "crosshair")
-addToggle(visualPage.right, "Fullbright", "Visibilidade em areas escuras", "fullBright", applyFullBright)
+addSection(visualPage, "Player ESP")
+addToggle(visualPage, "ESP de jogadores", "Highlight persistente e leve", "espEnabled", updateEsp)
+addToggle(visualPage, "Mostrar nomes", nil, "espNames", updateEsp)
+addToggle(visualPage, "Mostrar vida", nil, "espHealth", updateEsp)
+addToggle(visualPage, "Mostrar distancia", nil, "espDistance", updateEsp)
+addToggle(visualPage, "Mostrar aliados", nil, "espTeammates", updateEsp)
+addSection(visualPage, "World & Overlay")
+addToggle(visualPage, "Crosshair", nil, "crosshair")
+addToggle(visualPage, "Fullbright", "Visibilidade em areas escuras", "fullBright", applyFullBright)
 
 local playerPage = createTab("PLAYER", 3)
-addSection(playerPage.left, "Movement")
-addToggle(playerPage.left, "Velocidade personalizada", "Restaura ao desligar", "speedEnabled", function(enabled)
+addSection(playerPage, "Movement")
+addToggle(playerPage, "Velocidade personalizada", "Restaura ao desligar", "speedEnabled", function(enabled)
     if not enabled then
         restoreHumanoids()
     end
 end)
-addSlider(playerPage.left, "WalkSpeed", "walkSpeed", 16, 80, 2, "")
-addSection(playerPage.right, "Air & Collision")
-addToggle(playerPage.right, "Pulo infinito", nil, "infiniteJump")
-addToggle(playerPage.right, "Noclip", "Restaura colisoes ao desligar", "noclip", function(enabled)
+addSlider(playerPage, "WalkSpeed", "walkSpeed", 16, 80, 2, "")
+addToggle(playerPage, "Pulo infinito", nil, "infiniteJump")
+addToggle(playerPage, "Noclip", "Restaura colisoes ao desligar", "noclip", function(enabled)
     if not enabled then
         restoreNoclip()
     end
 end)
 
 local configPage = createTab("CONFIG", 4)
-addSection(configPage.left, "Session")
-addButton(configPage.left, "Reentrar no servidor", function()
+addSection(configPage, "Session")
+addButton(configPage, "Reentrar no servidor", function()
     setStatus("Reentrando no servidor...", colors.accent2)
     TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, localPlayer)
 end)
-addSection(configPage.right, "Safety")
-addButton(configPage.right, "Encerrar hub", cleanup, true)
+addButton(configPage, "Encerrar hub", cleanup, true)
 
 selectTab("AIMBOT")
 
@@ -1104,7 +1033,7 @@ local function setMinimized(value)
     content.Visible = not value
     statusBar.Visible = not value
     minimizeButton.Text = value and "+" or "-"
-    tween(main, {Size = value and UDim2.fromOffset(700, 48) or expandedSize}, 0.2)
+    tween(main, {Size = value and UDim2.fromOffset(590, 48) or expandedSize}, 0.2)
 end
 
 connect(minimizeButton.MouseButton1Click, function()
@@ -1258,5 +1187,5 @@ connect(RunService.RenderStepped, function(deltaTime)
     end
 end)
 
-setStatus("V10 SAFE | fluxo de mira restaurado | 0 ou RightCtrl", colors.team)
-print("B arney HUB | Arsenal v10 SAFE loaded")
+setStatus("V11 SAFE | interface estavel e mira restaurada | 0 ou RightCtrl", colors.team)
+print("B arney HUB | Arsenal v11 SAFE loaded")
