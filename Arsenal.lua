@@ -1,4 +1,4 @@
--- B arney HUB | Arsenal v7 SAFE
+-- B arney HUB | Arsenal v8 SAFE
 -- loadstring(game:HttpGet("https://raw.githubusercontent.com/barneybots/Arsenal/main/Arsenal.lua"))()
 
 local globalEnv = (getgenv and getgenv()) or _G
@@ -24,6 +24,10 @@ local noclipOriginals = setmetatable({}, {__mode = "k"})
 local destroyed = false
 local rightMouseDown = false
 local currentTarget = nil
+local currentTargetPlayer = nil
+local currentTargetCharacter = nil
+local currentTargetHumanoid = nil
+local targetDiedConnection = nil
 
 local defaultState = {
     aimEnabled = false,
@@ -55,15 +59,15 @@ for key, value in pairs(defaultState) do
 end
 
 local colors = {
-    background = Color3.fromRGB(13, 15, 19),
-    panel = Color3.fromRGB(18, 21, 27),
-    card = Color3.fromRGB(24, 28, 35),
-    cardHover = Color3.fromRGB(29, 35, 43),
-    accent = Color3.fromRGB(0, 201, 167),
-    accent2 = Color3.fromRGB(102, 235, 211),
-    text = Color3.fromRGB(226, 232, 239),
-    muted = Color3.fromRGB(119, 130, 145),
-    off = Color3.fromRGB(48, 56, 67),
+    background = Color3.fromRGB(12, 12, 16),
+    panel = Color3.fromRGB(18, 18, 24),
+    card = Color3.fromRGB(25, 25, 33),
+    cardHover = Color3.fromRGB(32, 32, 42),
+    accent = Color3.fromRGB(235, 70, 84),
+    accent2 = Color3.fromRGB(255, 149, 76),
+    text = Color3.fromRGB(232, 232, 238),
+    muted = Color3.fromRGB(126, 126, 142),
+    off = Color3.fromRGB(52, 52, 66),
     enemy = Color3.fromRGB(239, 76, 94),
     team = Color3.fromRGB(56, 211, 153),
 }
@@ -127,8 +131,8 @@ gui.Parent = getGuiParent()
 
 local main = Instance.new("Frame")
 main.Name = "Main"
-main.Size = UDim2.fromOffset(590, 410)
-main.Position = UDim2.new(0.5, -295, 0.5, -205)
+main.Size = UDim2.fromOffset(700, 440)
+main.Position = UDim2.new(0.5, -350, 0.5, -220)
 main.BackgroundColor3 = colors.background
 main.BorderSizePixel = 0
 main.ClipsDescendants = true
@@ -150,6 +154,9 @@ accentLine.Position = UDim2.new(0, 0, 1, -2)
 accentLine.BackgroundColor3 = colors.accent
 accentLine.BorderSizePixel = 0
 accentLine.Parent = topbar
+local accentGradient = Instance.new("UIGradient")
+accentGradient.Color = ColorSequence.new(colors.accent, colors.accent2)
+accentGradient.Parent = accentLine
 
 local brand = Instance.new("TextLabel")
 brand.Size = UDim2.new(1, -110, 0, 22)
@@ -166,7 +173,7 @@ local subtitle = Instance.new("TextLabel")
 subtitle.Size = UDim2.new(1, -110, 0, 15)
 subtitle.Position = UDim2.fromOffset(16, 27)
 subtitle.BackgroundTransparency = 1
-subtitle.Text = "PRIVATE BUILD  |  V7 SAFE MODE"
+subtitle.Text = "PRIVATE BUILD  |  V8 TARGET SAFETY"
 subtitle.TextColor3 = colors.accent2
 subtitle.Font = Enum.Font.Code
 subtitle.TextSize = 10
@@ -200,7 +207,7 @@ corner(closeButton, 3)
 stroke(closeButton, colors.off, 0.25)
 
 local sidebar = Instance.new("Frame")
-sidebar.Size = UDim2.new(0, 144, 1, -76)
+sidebar.Size = UDim2.new(0, 154, 1, -76)
 sidebar.Position = UDim2.fromOffset(0, 48)
 sidebar.BackgroundColor3 = colors.panel
 sidebar.BorderSizePixel = 0
@@ -216,9 +223,20 @@ local tabPadding = Instance.new("UIPadding")
 tabPadding.PaddingTop = UDim.new(0, 12)
 tabPadding.Parent = sidebar
 
+local navigationTitle = Instance.new("TextLabel")
+navigationTitle.Size = UDim2.new(1, -20, 0, 24)
+navigationTitle.BackgroundTransparency = 1
+navigationTitle.Text = "  MODULES"
+navigationTitle.TextColor3 = colors.accent2
+navigationTitle.Font = Enum.Font.Code
+navigationTitle.TextSize = 11
+navigationTitle.TextXAlignment = Enum.TextXAlignment.Left
+navigationTitle.LayoutOrder = -1
+navigationTitle.Parent = sidebar
+
 local content = Instance.new("Frame")
-content.Size = UDim2.new(1, -144, 1, -76)
-content.Position = UDim2.fromOffset(144, 48)
+content.Size = UDim2.new(1, -154, 1, -76)
+content.Position = UDim2.fromOffset(154, 48)
 content.BackgroundColor3 = colors.background
 content.BorderSizePixel = 0
 content.Parent = main
@@ -343,34 +361,53 @@ local function createTab(name, order)
     buttonPadding.PaddingLeft = UDim.new(0, 12)
     buttonPadding.Parent = button
 
-    local page = Instance.new("ScrollingFrame")
+    local page = Instance.new("Frame")
     page.Name = name .. "Page"
     page.Size = UDim2.new(1, -16, 1, -14)
     page.Position = UDim2.fromOffset(8, 7)
     page.BackgroundTransparency = 1
     page.BorderSizePixel = 0
-    page.ScrollBarThickness = 3
-    page.ScrollBarImageColor3 = colors.accent
-    page.AutomaticCanvasSize = Enum.AutomaticSize.Y
-    page.CanvasSize = UDim2.new()
     page.Visible = false
     page.Parent = content
 
-    local layout = Instance.new("UIListLayout")
-    layout.Padding = UDim.new(0, 7)
-    layout.SortOrder = Enum.SortOrder.LayoutOrder
-    layout.Parent = page
+    local function createColumn(position)
+        local column = Instance.new("ScrollingFrame")
+        column.Size = UDim2.new(0.5, -5, 1, 0)
+        column.Position = UDim2.new(position, position == 0 and 0 or 5, 0, 0)
+        column.BackgroundColor3 = colors.panel
+        column.BackgroundTransparency = 0.3
+        column.BorderSizePixel = 0
+        column.ScrollBarThickness = 2
+        column.ScrollBarImageColor3 = colors.accent
+        column.AutomaticCanvasSize = Enum.AutomaticSize.Y
+        column.CanvasSize = UDim2.new()
+        column.Parent = page
+        corner(column, 3)
+        stroke(column, colors.off, 0.55)
 
-    local padding = Instance.new("UIPadding")
-    padding.PaddingBottom = UDim.new(0, 8)
-    padding.Parent = page
+        local layout = Instance.new("UIListLayout")
+        layout.Padding = UDim.new(0, 7)
+        layout.SortOrder = Enum.SortOrder.LayoutOrder
+        layout.Parent = column
+
+        local padding = Instance.new("UIPadding")
+        padding.PaddingTop = UDim.new(0, 8)
+        padding.PaddingLeft = UDim.new(0, 7)
+        padding.PaddingRight = UDim.new(0, 3)
+        padding.PaddingBottom = UDim.new(0, 8)
+        padding.Parent = column
+        return column
+    end
+
+    local leftColumn = createColumn(0)
+    local rightColumn = createColumn(0.5)
 
     tabs[name] = {button = button, page = page, indicator = indicator}
     connect(button.MouseButton1Click, function()
         selectTab(name)
     end)
 
-    return page
+    return {left = leftColumn, right = rightColumn}
 end
 
 local function addSection(page, text)
@@ -617,7 +654,75 @@ end
 local function isAlive(player)
     local character = player.Character
     local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-    return character ~= nil and humanoid ~= nil and humanoid.Health > 0
+    return character ~= nil
+        and humanoid ~= nil
+        and humanoid.Health > 0
+        and humanoid:GetState() ~= Enum.HumanoidStateType.Dead
+end
+
+local function clearCurrentTarget()
+    if targetDiedConnection then
+        targetDiedConnection:Disconnect()
+        targetDiedConnection = nil
+    end
+    currentTarget = nil
+    currentTargetPlayer = nil
+    currentTargetCharacter = nil
+    currentTargetHumanoid = nil
+end
+
+local function setCurrentTarget(part, player, humanoid)
+    if currentTarget == part
+        and currentTargetPlayer == player
+        and currentTargetHumanoid == humanoid then
+        return
+    end
+
+    clearCurrentTarget()
+    if not part or not player or not humanoid then
+        return
+    end
+
+    currentTarget = part
+    currentTargetPlayer = player
+    currentTargetCharacter = player.Character
+    currentTargetHumanoid = humanoid
+    targetDiedConnection = humanoid.Died:Connect(function()
+        if currentTargetHumanoid == humanoid then
+            clearCurrentTarget()
+        end
+    end)
+end
+
+local function hasDeathMarker(owner)
+    if not owner then
+        return false
+    end
+    if owner:GetAttribute("Dead") == true or owner:GetAttribute("Alive") == false then
+        return true
+    end
+    local marker = owner:FindFirstChild("Dead")
+    return marker and marker:IsA("BoolValue") and marker.Value
+end
+
+local function isCurrentTargetValid()
+    if not currentTarget or not currentTargetPlayer
+        or not currentTargetCharacter or not currentTargetHumanoid then
+        return false
+    end
+    if currentTargetPlayer.Parent ~= Players
+        or currentTargetPlayer.Character ~= currentTargetCharacter
+        or not currentTarget:IsDescendantOf(currentTargetCharacter)
+        or not currentTargetCharacter:IsDescendantOf(Workspace) then
+        return false
+    end
+    if currentTargetHumanoid.Health <= 0
+        or currentTargetHumanoid:GetState() == Enum.HumanoidStateType.Dead
+        or hasDeathMarker(currentTargetCharacter)
+        or hasDeathMarker(currentTargetPlayer) then
+        return false
+    end
+    return currentTarget.Position.Y > Workspace.FallenPartsDestroyHeight + 25
 end
 
 local function getAimPart(character)
@@ -646,6 +751,8 @@ end
 local function getClosestTarget(maximumFov)
     local mousePosition = UserInputService:GetMouseLocation()
     local closestPart = nil
+    local closestPlayer = nil
+    local closestHumanoid = nil
     local closestDistance = maximumFov or state.aimFov
 
     for _, player in ipairs(Players:GetPlayers()) do
@@ -661,12 +768,14 @@ local function getClosestTarget(maximumFov)
                     if distance < closestDistance and isVisible(character, part) then
                         closestDistance = distance
                         closestPart = part
+                        closestPlayer = player
+                        closestHumanoid = character:FindFirstChildOfClass("Humanoid")
                     end
                 end
             end
         end
     end
-    return closestPart
+    return closestPart, closestPlayer, closestHumanoid
 end
 
 local function destroyEsp(player)
@@ -875,6 +984,7 @@ cleanup = function()
         return
     end
     destroyed = true
+    clearCurrentTarget()
     clearEsp()
     restoreHumanoids()
     restoreNoclip()
@@ -899,49 +1009,52 @@ globalEnv.__BARNEY_ARSENAL_RUNTIME = {
 }
 
 local aimPage = createTab("AIMBOT", 1)
-addSection(aimPage, "Assistencia de mira")
-addToggle(aimPage, "Aim Assist", "Mire no alvo mais proximo dentro do FOV", "aimEnabled")
-addToggle(aimPage, "Segurar botao direito", "Ativa a mira somente enquanto estiver pressionado", "aimOnRightMouse")
-addSlider(aimPage, "FOV", "aimFov", 40, 400, 5, "px")
-addSlider(aimPage, "Suavidade (1 = mais forte)", "aimSmoothness", 1, 20, 1, "")
-addCycle(aimPage, "Parte do corpo", "aimPart", {"Head", "UpperTorso", "HumanoidRootPart"})
-addToggle(aimPage, "Checar equipe", nil, "teamCheck", updateEsp)
-addToggle(aimPage, "Checar paredes", nil, "wallCheck")
-addToggle(aimPage, "Mostrar circulo FOV", nil, "showFov")
+addSection(aimPage.left, "Assistencia de mira")
+addToggle(aimPage.left, "Aim Assist", "Alvo mais proximo dentro do FOV", "aimEnabled")
+addToggle(aimPage.left, "Segurar botao direito", "Ativa somente enquanto pressionado", "aimOnRightMouse")
+addSlider(aimPage.left, "FOV", "aimFov", 40, 400, 5, "px")
+addSlider(aimPage.left, "Suavidade (1 = forte)", "aimSmoothness", 1, 20, 1, "")
+addSection(aimPage.right, "Selecao de alvo")
+addCycle(aimPage.right, "Hitbox", "aimPart", {"Head", "UpperTorso", "HumanoidRootPart"})
+addToggle(aimPage.right, "Checar equipe", nil, "teamCheck", updateEsp)
+addToggle(aimPage.right, "Checar paredes", nil, "wallCheck")
+addToggle(aimPage.right, "Mostrar circulo FOV", nil, "showFov")
 
 local visualPage = createTab("VISUALS", 2)
-addSection(visualPage, "ESP")
-addToggle(visualPage, "ESP de jogadores", "Highlight estavel, sem recriar a cada frame", "espEnabled", updateEsp)
-addToggle(visualPage, "Mostrar nomes", nil, "espNames", updateEsp)
-addToggle(visualPage, "Mostrar vida", nil, "espHealth", updateEsp)
-addToggle(visualPage, "Mostrar distancia", nil, "espDistance", updateEsp)
-addToggle(visualPage, "Mostrar aliados", nil, "espTeammates", updateEsp)
-addSection(visualPage, "Tela")
-addToggle(visualPage, "Crosshair", nil, "crosshair")
-addToggle(visualPage, "Fullbright", "Melhora a visibilidade em areas escuras", "fullBright", applyFullBright)
+addSection(visualPage.left, "Player ESP")
+addToggle(visualPage.left, "ESP de jogadores", "Highlight persistente e leve", "espEnabled", updateEsp)
+addToggle(visualPage.left, "Mostrar nomes", nil, "espNames", updateEsp)
+addToggle(visualPage.left, "Mostrar vida", nil, "espHealth", updateEsp)
+addToggle(visualPage.left, "Mostrar distancia", nil, "espDistance", updateEsp)
+addSection(visualPage.right, "World & Overlay")
+addToggle(visualPage.right, "Mostrar aliados", nil, "espTeammates", updateEsp)
+addToggle(visualPage.right, "Crosshair", nil, "crosshair")
+addToggle(visualPage.right, "Fullbright", "Visibilidade em areas escuras", "fullBright", applyFullBright)
 
 local playerPage = createTab("PLAYER", 3)
-addSection(playerPage, "Movimento")
-addToggle(playerPage, "Velocidade personalizada", "Restaura o valor original ao desligar", "speedEnabled", function(enabled)
+addSection(playerPage.left, "Movement")
+addToggle(playerPage.left, "Velocidade personalizada", "Restaura ao desligar", "speedEnabled", function(enabled)
     if not enabled then
         restoreHumanoids()
     end
 end)
-addSlider(playerPage, "WalkSpeed", "walkSpeed", 16, 80, 2, "")
-addToggle(playerPage, "Pulo infinito", nil, "infiniteJump")
-addToggle(playerPage, "Noclip", "Atravessa paredes e restaura colisoes ao desligar", "noclip", function(enabled)
+addSlider(playerPage.left, "WalkSpeed", "walkSpeed", 16, 80, 2, "")
+addSection(playerPage.right, "Air & Collision")
+addToggle(playerPage.right, "Pulo infinito", nil, "infiniteJump")
+addToggle(playerPage.right, "Noclip", "Restaura colisoes ao desligar", "noclip", function(enabled)
     if not enabled then
         restoreNoclip()
     end
 end)
 
 local configPage = createTab("CONFIG", 4)
-addSection(configPage, "Sessao - configuracoes nao sao salvas")
-addButton(configPage, "Reentrar no servidor", function()
+addSection(configPage.left, "Session")
+addButton(configPage.left, "Reentrar no servidor", function()
     setStatus("Reentrando no servidor...", colors.accent2)
     TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, localPlayer)
 end)
-addButton(configPage, "Encerrar hub", cleanup, true)
+addSection(configPage.right, "Safety")
+addButton(configPage.right, "Encerrar hub", cleanup, true)
 
 selectTab("AIMBOT")
 
@@ -983,7 +1096,7 @@ local function setMinimized(value)
     content.Visible = not value
     statusBar.Visible = not value
     minimizeButton.Text = value and "+" or "-"
-    tween(main, {Size = value and UDim2.fromOffset(590, 48) or expandedSize}, 0.2)
+    tween(main, {Size = value and UDim2.fromOffset(700, 48) or expandedSize}, 0.2)
 end
 
 connect(minimizeButton.MouseButton1Click, function()
@@ -1006,7 +1119,7 @@ end)
 connect(UserInputService.InputEnded, function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton2 then
         rightMouseDown = false
-        currentTarget = nil
+        clearCurrentTarget()
     end
 end)
 
@@ -1083,6 +1196,10 @@ connect(RunService.RenderStepped, function(deltaTime)
     fpsElapsed = fpsElapsed + deltaTime
     espElapsed = espElapsed + deltaTime
     aimElapsed = aimElapsed + deltaTime
+    if currentTarget and not isCurrentTargetValid() then
+        clearCurrentTarget()
+        aimElapsed = 0.04
+    end
     local mousePosition = UserInputService:GetMouseLocation()
     local showFov = state.showFov and state.aimEnabled
     fovCircle.Visible = showFov
@@ -1101,18 +1218,19 @@ connect(RunService.RenderStepped, function(deltaTime)
 
     local shouldAim = state.aimEnabled and (not state.aimOnRightMouse or rightMouseDown)
     if shouldAim then
-        if aimElapsed >= 0.04 or not currentTarget or not currentTarget.Parent then
+        if aimElapsed >= 0.04 then
             aimElapsed = 0
-            currentTarget = getClosestTarget()
+            local part, player, humanoid = getClosestTarget()
+            setCurrentTarget(part, player, humanoid)
         end
-        if currentTarget then
+        if currentTarget and isCurrentTargetValid() then
             local goal = CFrame.lookAt(camera.CFrame.Position, currentTarget.Position)
             local strength = ((21 - state.aimSmoothness) * 3.5) + 2
             local alpha = 1 - math.exp(-strength * deltaTime)
             camera.CFrame = camera.CFrame:Lerp(goal, alpha)
         end
     else
-        currentTarget = nil
+        clearCurrentTarget()
         aimElapsed = 0
     end
 
@@ -1133,5 +1251,5 @@ connect(RunService.RenderStepped, function(deltaTime)
     end
 end)
 
-setStatus("V7 SAFE | sem arquivos, armas ou clique virtual | 0 ou RightCtrl", colors.team)
-print("B arney HUB | Arsenal v7 SAFE loaded")
+setStatus("V8 SAFE | alvo morto ignorado | 0 ou RightCtrl", colors.team)
+print("B arney HUB | Arsenal v8 SAFE loaded")
