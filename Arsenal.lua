@@ -1,4 +1,4 @@
--- B arney HUB | Arsenal v8 SAFE
+-- B arney HUB | Arsenal v9 SAFE
 -- loadstring(game:HttpGet("https://raw.githubusercontent.com/barneybots/Arsenal/main/Arsenal.lua"))()
 
 local globalEnv = (getgenv and getgenv()) or _G
@@ -31,12 +31,12 @@ local targetDiedConnection = nil
 
 local defaultState = {
     aimEnabled = false,
-    aimOnRightMouse = true,
+    aimOnRightMouse = false,
     aimFov = 160,
     aimSmoothness = 3,
     aimPart = "Head",
     teamCheck = true,
-    wallCheck = true,
+    wallCheck = false,
     showFov = true,
 
     espEnabled = false,
@@ -173,7 +173,7 @@ local subtitle = Instance.new("TextLabel")
 subtitle.Size = UDim2.new(1, -110, 0, 15)
 subtitle.Position = UDim2.fromOffset(16, 27)
 subtitle.BackgroundTransparency = 1
-subtitle.Text = "PRIVATE BUILD  |  V8 TARGET SAFETY"
+subtitle.Text = "PRIVATE BUILD  |  V9 AIM HOTFIX"
 subtitle.TextColor3 = colors.accent2
 subtitle.Font = Enum.Font.Code
 subtitle.TextSize = 10
@@ -657,7 +657,6 @@ local function isAlive(player)
     return character ~= nil
         and humanoid ~= nil
         and humanoid.Health > 0
-        and humanoid:GetState() ~= Enum.HumanoidStateType.Dead
 end
 
 local function clearCurrentTarget()
@@ -698,7 +697,7 @@ local function hasDeathMarker(owner)
     if not owner then
         return false
     end
-    if owner:GetAttribute("Dead") == true or owner:GetAttribute("Alive") == false then
+    if owner:GetAttribute("Dead") == true then
         return true
     end
     local marker = owner:FindFirstChild("Dead")
@@ -718,8 +717,7 @@ local function isCurrentTargetValid()
     end
     if currentTargetHumanoid.Health <= 0
         or currentTargetHumanoid:GetState() == Enum.HumanoidStateType.Dead
-        or hasDeathMarker(currentTargetCharacter)
-        or hasDeathMarker(currentTargetPlayer) then
+        or hasDeathMarker(currentTargetCharacter) then
         return false
     end
     return currentTarget.Position.Y > Workspace.FallenPartsDestroyHeight + 25
@@ -742,7 +740,11 @@ local function isVisible(character, part)
     end
     local params = RaycastParams.new()
     params.FilterType = Enum.RaycastFilterType.Exclude
-    params.FilterDescendantsInstances = localPlayer.Character and {localPlayer.Character} or {}
+    local ignored = {camera}
+    if localPlayer.Character then
+        table.insert(ignored, localPlayer.Character)
+    end
+    params.FilterDescendantsInstances = ignored
     params.IgnoreWater = true
     local result = Workspace:Raycast(origin, direction, params)
     return result == nil or result.Instance:IsDescendantOf(character)
@@ -1251,5 +1253,5 @@ connect(RunService.RenderStepped, function(deltaTime)
     end
 end)
 
-setStatus("V8 SAFE | alvo morto ignorado | 0 ou RightCtrl", colors.team)
-print("B arney HUB | Arsenal v8 SAFE loaded")
+setStatus("V9 SAFE | Aim Assist ativo sem RMB | 0 ou RightCtrl", colors.team)
+print("B arney HUB | Arsenal v9 SAFE loaded")
