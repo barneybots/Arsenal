@@ -1,4 +1,4 @@
--- B arney HUB | Arsenal v9 SAFE
+-- B arney HUB | Arsenal v10 SAFE
 -- loadstring(game:HttpGet("https://raw.githubusercontent.com/barneybots/Arsenal/main/Arsenal.lua"))()
 
 local globalEnv = (getgenv and getgenv()) or _G
@@ -24,18 +24,16 @@ local noclipOriginals = setmetatable({}, {__mode = "k"})
 local destroyed = false
 local rightMouseDown = false
 local currentTarget = nil
-local currentTargetPlayer = nil
-local currentTargetCharacter = nil
 local currentTargetHumanoid = nil
 local targetDiedConnection = nil
 
 local defaultState = {
     aimEnabled = false,
     aimOnRightMouse = false,
-    aimFov = 160,
+    aimFov = 220,
     aimSmoothness = 3,
     aimPart = "Head",
-    teamCheck = true,
+    teamCheck = false,
     wallCheck = false,
     showFov = true,
 
@@ -59,15 +57,15 @@ for key, value in pairs(defaultState) do
 end
 
 local colors = {
-    background = Color3.fromRGB(12, 12, 16),
-    panel = Color3.fromRGB(18, 18, 24),
-    card = Color3.fromRGB(25, 25, 33),
-    cardHover = Color3.fromRGB(32, 32, 42),
-    accent = Color3.fromRGB(235, 70, 84),
-    accent2 = Color3.fromRGB(255, 149, 76),
-    text = Color3.fromRGB(232, 232, 238),
-    muted = Color3.fromRGB(126, 126, 142),
-    off = Color3.fromRGB(52, 52, 66),
+    background = Color3.fromRGB(11, 13, 20),
+    panel = Color3.fromRGB(17, 20, 30),
+    card = Color3.fromRGB(24, 28, 41),
+    cardHover = Color3.fromRGB(31, 36, 52),
+    accent = Color3.fromRGB(91, 104, 255),
+    accent2 = Color3.fromRGB(75, 191, 255),
+    text = Color3.fromRGB(234, 236, 244),
+    muted = Color3.fromRGB(119, 127, 151),
+    off = Color3.fromRGB(48, 55, 74),
     enemy = Color3.fromRGB(239, 76, 94),
     team = Color3.fromRGB(56, 211, 153),
 }
@@ -147,6 +145,13 @@ topbar.BackgroundColor3 = colors.panel
 topbar.BorderSizePixel = 0
 topbar.Active = true
 topbar.Parent = main
+local topbarGradient = Instance.new("UIGradient")
+topbarGradient.Color = ColorSequence.new(
+    Color3.fromRGB(22, 25, 38),
+    Color3.fromRGB(15, 18, 27)
+)
+topbarGradient.Rotation = 90
+topbarGradient.Parent = topbar
 
 local accentLine = Instance.new("Frame")
 accentLine.Size = UDim2.new(1, 0, 0, 2)
@@ -173,12 +178,40 @@ local subtitle = Instance.new("TextLabel")
 subtitle.Size = UDim2.new(1, -110, 0, 15)
 subtitle.Position = UDim2.fromOffset(16, 27)
 subtitle.BackgroundTransparency = 1
-subtitle.Text = "PRIVATE BUILD  |  V9 AIM HOTFIX"
+subtitle.Text = "PRIVATE BUILD  |  V10 AIM RESTORED"
 subtitle.TextColor3 = colors.accent2
 subtitle.Font = Enum.Font.Code
 subtitle.TextSize = 10
 subtitle.TextXAlignment = Enum.TextXAlignment.Left
 subtitle.Parent = topbar
+
+local profileBadge = Instance.new("Frame")
+profileBadge.Size = UDim2.fromOffset(102, 28)
+profileBadge.Position = UDim2.new(1, -182, 0, 10)
+profileBadge.BackgroundColor3 = colors.card
+profileBadge.BorderSizePixel = 0
+profileBadge.Parent = topbar
+corner(profileBadge, 3)
+stroke(profileBadge, colors.off, 0.25)
+
+local profileDot = Instance.new("Frame")
+profileDot.Size = UDim2.fromOffset(7, 7)
+profileDot.Position = UDim2.fromOffset(10, 11)
+profileDot.BackgroundColor3 = colors.accent2
+profileDot.BorderSizePixel = 0
+profileDot.Parent = profileBadge
+corner(profileDot, 4)
+
+local profileText = Instance.new("TextLabel")
+profileText.Size = UDim2.new(1, -27, 1, 0)
+profileText.Position = UDim2.fromOffset(23, 0)
+profileText.BackgroundTransparency = 1
+profileText.Text = "barney / active"
+profileText.TextColor3 = colors.text
+profileText.Font = Enum.Font.Code
+profileText.TextSize = 10
+profileText.TextXAlignment = Enum.TextXAlignment.Left
+profileText.Parent = profileBadge
 
 local minimizeButton = Instance.new("TextButton")
 minimizeButton.Size = UDim2.fromOffset(32, 28)
@@ -665,62 +698,40 @@ local function clearCurrentTarget()
         targetDiedConnection = nil
     end
     currentTarget = nil
-    currentTargetPlayer = nil
-    currentTargetCharacter = nil
     currentTargetHumanoid = nil
 end
 
-local function setCurrentTarget(part, player, humanoid)
-    if currentTarget == part
-        and currentTargetPlayer == player
-        and currentTargetHumanoid == humanoid then
+local function setCurrentTarget(part)
+    if currentTarget == part then
         return
     end
 
     clearCurrentTarget()
-    if not part or not player or not humanoid then
+    if not part then
         return
     end
 
     currentTarget = part
-    currentTargetPlayer = player
-    currentTargetCharacter = player.Character
+    local character = part:FindFirstAncestorOfClass("Model")
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
     currentTargetHumanoid = humanoid
-    targetDiedConnection = humanoid.Died:Connect(function()
-        if currentTargetHumanoid == humanoid then
-            clearCurrentTarget()
-        end
-    end)
+    if humanoid then
+        targetDiedConnection = humanoid.Died:Connect(function()
+            if currentTargetHumanoid == humanoid then
+                clearCurrentTarget()
+            end
+        end)
+    end
 end
 
-local function hasDeathMarker(owner)
-    if not owner then
-        return false
-    end
-    if owner:GetAttribute("Dead") == true then
+local function isCurrentTargetDead()
+    if not currentTarget or not currentTarget.Parent then
         return true
     end
-    local marker = owner:FindFirstChild("Dead")
-    return marker and marker:IsA("BoolValue") and marker.Value
-end
-
-local function isCurrentTargetValid()
-    if not currentTarget or not currentTargetPlayer
-        or not currentTargetCharacter or not currentTargetHumanoid then
-        return false
+    if currentTargetHumanoid and currentTargetHumanoid.Health <= 0 then
+        return true
     end
-    if currentTargetPlayer.Parent ~= Players
-        or currentTargetPlayer.Character ~= currentTargetCharacter
-        or not currentTarget:IsDescendantOf(currentTargetCharacter)
-        or not currentTargetCharacter:IsDescendantOf(Workspace) then
-        return false
-    end
-    if currentTargetHumanoid.Health <= 0
-        or currentTargetHumanoid:GetState() == Enum.HumanoidStateType.Dead
-        or hasDeathMarker(currentTargetCharacter) then
-        return false
-    end
-    return currentTarget.Position.Y > Workspace.FallenPartsDestroyHeight + 25
+    return currentTarget.Position.Y <= Workspace.FallenPartsDestroyHeight + 25
 end
 
 local function getAimPart(character)
@@ -740,11 +751,7 @@ local function isVisible(character, part)
     end
     local params = RaycastParams.new()
     params.FilterType = Enum.RaycastFilterType.Exclude
-    local ignored = {camera}
-    if localPlayer.Character then
-        table.insert(ignored, localPlayer.Character)
-    end
-    params.FilterDescendantsInstances = ignored
+    params.FilterDescendantsInstances = localPlayer.Character and {localPlayer.Character} or {}
     params.IgnoreWater = true
     local result = Workspace:Raycast(origin, direction, params)
     return result == nil or result.Instance:IsDescendantOf(character)
@@ -753,8 +760,6 @@ end
 local function getClosestTarget(maximumFov)
     local mousePosition = UserInputService:GetMouseLocation()
     local closestPart = nil
-    local closestPlayer = nil
-    local closestHumanoid = nil
     local closestDistance = maximumFov or state.aimFov
 
     for _, player in ipairs(Players:GetPlayers()) do
@@ -770,14 +775,12 @@ local function getClosestTarget(maximumFov)
                     if distance < closestDistance and isVisible(character, part) then
                         closestDistance = distance
                         closestPart = part
-                        closestPlayer = player
-                        closestHumanoid = character:FindFirstChildOfClass("Humanoid")
                     end
                 end
             end
         end
     end
-    return closestPart, closestPlayer, closestHumanoid
+    return closestPart
 end
 
 local function destroyEsp(player)
@@ -1012,7 +1015,10 @@ globalEnv.__BARNEY_ARSENAL_RUNTIME = {
 
 local aimPage = createTab("AIMBOT", 1)
 addSection(aimPage.left, "Assistencia de mira")
-addToggle(aimPage.left, "Aim Assist", "Alvo mais proximo dentro do FOV", "aimEnabled")
+addToggle(aimPage.left, "Aim Assist", "Alvo mais proximo dentro do FOV", "aimEnabled", function(enabled)
+    setStatus(enabled and "AIM ASSIST: ENABLED" or "AIM ASSIST: DISABLED",
+        enabled and colors.accent2 or colors.muted)
+end)
 addToggle(aimPage.left, "Segurar botao direito", "Ativa somente enquanto pressionado", "aimOnRightMouse")
 addSlider(aimPage.left, "FOV", "aimFov", 40, 400, 5, "px")
 addSlider(aimPage.left, "Suavidade (1 = forte)", "aimSmoothness", 1, 20, 1, "")
@@ -1198,7 +1204,7 @@ connect(RunService.RenderStepped, function(deltaTime)
     fpsElapsed = fpsElapsed + deltaTime
     espElapsed = espElapsed + deltaTime
     aimElapsed = aimElapsed + deltaTime
-    if currentTarget and not isCurrentTargetValid() then
+    if currentTarget and isCurrentTargetDead() then
         clearCurrentTarget()
         aimElapsed = 0.04
     end
@@ -1220,12 +1226,11 @@ connect(RunService.RenderStepped, function(deltaTime)
 
     local shouldAim = state.aimEnabled and (not state.aimOnRightMouse or rightMouseDown)
     if shouldAim then
-        if aimElapsed >= 0.04 then
+        if aimElapsed >= 0.04 or not currentTarget or not currentTarget.Parent then
             aimElapsed = 0
-            local part, player, humanoid = getClosestTarget()
-            setCurrentTarget(part, player, humanoid)
+            setCurrentTarget(getClosestTarget())
         end
-        if currentTarget and isCurrentTargetValid() then
+        if currentTarget and not isCurrentTargetDead() then
             local goal = CFrame.lookAt(camera.CFrame.Position, currentTarget.Position)
             local strength = ((21 - state.aimSmoothness) * 3.5) + 2
             local alpha = 1 - math.exp(-strength * deltaTime)
@@ -1253,5 +1258,5 @@ connect(RunService.RenderStepped, function(deltaTime)
     end
 end)
 
-setStatus("V9 SAFE | Aim Assist ativo sem RMB | 0 ou RightCtrl", colors.team)
-print("B arney HUB | Arsenal v9 SAFE loaded")
+setStatus("V10 SAFE | fluxo de mira restaurado | 0 ou RightCtrl", colors.team)
+print("B arney HUB | Arsenal v10 SAFE loaded")
