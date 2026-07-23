@@ -1,4 +1,4 @@
--- B arney HUB | Arsenal v6
+-- B arney HUB | Arsenal v7 SAFE
 -- loadstring(game:HttpGet("https://raw.githubusercontent.com/barneybots/Arsenal/main/Arsenal.lua"))()
 
 local globalEnv = (getgenv and getgenv()) or _G
@@ -14,10 +14,6 @@ local Lighting = game:GetService("Lighting")
 local TeleportService = game:GetService("TeleportService")
 local CoreGui = game:GetService("CoreGui")
 local Workspace = game:GetService("Workspace")
-local VirtualInputManager = nil
-pcall(function()
-    VirtualInputManager = game:GetService("VirtualInputManager")
-end)
 
 local localPlayer = Players.LocalPlayer
 local camera = Workspace.CurrentCamera
@@ -49,7 +45,6 @@ local defaultState = {
     walkSpeed = 32,
     infiniteJump = false,
     noclip = false,
-    triggerBot = false,
     fullBright = false,
     crosshair = false,
 }
@@ -58,13 +53,6 @@ local state = {}
 for key, value in pairs(defaultState) do
     state[key] = value
 end
-
-pcall(function()
-    if type(isfile) == "function" and type(delfile) == "function"
-        and isfile("BarneyHub_Arsenal.json") then
-        delfile("BarneyHub_Arsenal.json")
-    end
-end)
 
 local colors = {
     background = Color3.fromRGB(13, 15, 19),
@@ -111,12 +99,6 @@ local function tween(instance, properties, duration)
 end
 
 local function getGuiParent()
-    if gethui then
-        local ok, result = pcall(gethui)
-        if ok and result then
-            return result
-        end
-    end
     return CoreGui
 end
 
@@ -141,9 +123,6 @@ gui.ResetOnSpawn = false
 gui.IgnoreGuiInset = true
 gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 gui.DisplayOrder = 999999
-if syn and syn.protect_gui then
-    pcall(syn.protect_gui, gui)
-end
 gui.Parent = getGuiParent()
 
 local main = Instance.new("Frame")
@@ -187,7 +166,7 @@ local subtitle = Instance.new("TextLabel")
 subtitle.Size = UDim2.new(1, -110, 0, 15)
 subtitle.Position = UDim2.fromOffset(16, 27)
 subtitle.BackgroundTransparency = 1
-subtitle.Text = "PRIVATE BUILD  |  V6 SAFE WEAPONS"
+subtitle.Text = "PRIVATE BUILD  |  V7 SAFE MODE"
 subtitle.TextColor3 = colors.accent2
 subtitle.Font = Enum.Font.Code
 subtitle.TextSize = 10
@@ -955,7 +934,6 @@ addToggle(playerPage, "Noclip", "Atravessa paredes e restaura colisoes ao deslig
         restoreNoclip()
     end
 end)
-addToggle(playerPage, "Trigger Bot", "Atira automaticamente quando o inimigo esta na mira", "triggerBot")
 
 local configPage = createTab("CONFIG", 4)
 addSection(configPage, "Sessao - configuracoes nao sao salvas")
@@ -1057,34 +1035,6 @@ local fpsFrames = 0
 local fpsElapsed = 0
 local espElapsed = 0
 local aimElapsed = 0
-local triggerElapsed = 0
-local lastTriggerShot = 0
-
-local function fireMouseOnce()
-    local now = os.clock()
-    if now - lastTriggerShot < 0.11 then
-        return
-    end
-    lastTriggerShot = now
-    if type(mouse1click) == "function" then
-        pcall(mouse1click)
-    elseif type(mouse1press) == "function" and type(mouse1release) == "function" then
-        pcall(mouse1press)
-        task.delay(0.025, function()
-            pcall(mouse1release)
-        end)
-    elseif VirtualInputManager then
-        local position = UserInputService:GetMouseLocation()
-        pcall(function()
-            VirtualInputManager:SendMouseButtonEvent(position.X, position.Y, 0, true, game, 0)
-        end)
-        task.delay(0.025, function()
-            pcall(function()
-                VirtualInputManager:SendMouseButtonEvent(position.X, position.Y, 0, false, game, 0)
-            end)
-        end)
-    end
-end
 
 local noclipElapsed = 0
 connect(RunService.Heartbeat, function(deltaTime)
@@ -1133,7 +1083,6 @@ connect(RunService.RenderStepped, function(deltaTime)
     fpsElapsed = fpsElapsed + deltaTime
     espElapsed = espElapsed + deltaTime
     aimElapsed = aimElapsed + deltaTime
-    triggerElapsed = triggerElapsed + deltaTime
     local mousePosition = UserInputService:GetMouseLocation()
     local showFov = state.showFov and state.aimEnabled
     fovCircle.Visible = showFov
@@ -1167,22 +1116,6 @@ connect(RunService.RenderStepped, function(deltaTime)
         aimElapsed = 0
     end
 
-    if state.triggerBot and triggerElapsed >= 0.05 then
-        triggerElapsed = 0
-        local triggerTarget = currentTarget or getClosestTarget(20)
-        if triggerTarget then
-            local sp, vis = camera:WorldToViewportPoint(triggerTarget.Position)
-            if vis then
-                local dist = (mousePosition - Vector2.new(sp.X, sp.Y)).Magnitude
-                if dist < 20 then
-                    fireMouseOnce()
-                end
-            end
-        end
-    elseif not state.triggerBot then
-        triggerElapsed = 0
-    end
-
     if espElapsed >= 0.2 then
         espElapsed = 0
         updateEsp()
@@ -1200,5 +1133,5 @@ connect(RunService.RenderStepped, function(deltaTime)
     end
 end)
 
-setStatus("Sem auto-save | armas nao sao modificadas | 0 ou RightCtrl", colors.team)
-print("B arney HUB | Arsenal v6 loaded")
+setStatus("V7 SAFE | sem arquivos, armas ou clique virtual | 0 ou RightCtrl", colors.team)
+print("B arney HUB | Arsenal v7 SAFE loaded")
