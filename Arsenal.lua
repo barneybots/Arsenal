@@ -1,4 +1,4 @@
--- B arney HUB | Arsenal v4
+-- B arney HUB | Arsenal v5
 -- loadstring(game:HttpGet("https://raw.githubusercontent.com/barneybots/Arsenal/main/Arsenal.lua"))()
 
 local globalEnv = (getgenv and getgenv()) or _G
@@ -16,6 +16,10 @@ local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
 local CoreGui = game:GetService("CoreGui")
 local Workspace = game:GetService("Workspace")
+local VirtualInputManager = nil
+pcall(function()
+    VirtualInputManager = game:GetService("VirtualInputManager")
+end)
 
 local localPlayer = Players.LocalPlayer
 local camera = Workspace.CurrentCamera
@@ -23,6 +27,7 @@ local connections = {}
 local espObjects = {}
 local weaponOriginals = {}
 local humanoidOriginals = setmetatable({}, {__mode = "k"})
+local noclipOriginals = setmetatable({}, {__mode = "k"})
 local destroyed = false
 local rightMouseDown = false
 local currentTarget = nil
@@ -31,7 +36,7 @@ local defaultState = {
     aimEnabled = false,
     aimOnRightMouse = true,
     aimFov = 160,
-    aimSmoothness = 14,
+    aimSmoothness = 3,
     aimPart = "Head",
     teamCheck = true,
     wallCheck = true,
@@ -64,6 +69,7 @@ for key, value in pairs(defaultState) do
 end
 
 local configFile = "BarneyHub_Arsenal.json"
+local configVersion = 2
 local configLoaded = false
 local configSaveToken = 0
 
@@ -83,7 +89,7 @@ local function saveConfig()
             savedState[key] = state[key]
         end
         writefile(configFile, HttpService:JSONEncode({
-            version = 1,
+            version = configVersion,
             settings = savedState,
         }))
     end)
@@ -116,8 +122,12 @@ local function loadConfig()
                 state[key] = savedValue
             end
         end
+        if decoded.version ~= configVersion then
+            state.aimSmoothness = defaultState.aimSmoothness
+            state.fastReload = false
+        end
         state.aimFov = math.clamp(state.aimFov, 40, 400)
-        state.aimSmoothness = math.clamp(state.aimSmoothness, 2, 30)
+        state.aimSmoothness = math.clamp(state.aimSmoothness, 1, 20)
         state.walkSpeed = math.clamp(state.walkSpeed, 16, 80)
         if not table.find({"Head", "UpperTorso", "HumanoidRootPart"}, state.aimPart) then
             state.aimPart = defaultState.aimPart
@@ -250,7 +260,7 @@ local subtitle = Instance.new("TextLabel")
 subtitle.Size = UDim2.new(1, -110, 0, 15)
 subtitle.Position = UDim2.fromOffset(16, 27)
 subtitle.BackgroundTransparency = 1
-subtitle.Text = "PRIVATE BUILD  |  PERFORMANCE MODE"
+subtitle.Text = "PRIVATE BUILD  |  V5 PERFORMANCE MODE"
 subtitle.TextColor3 = colors.accent2
 subtitle.Font = Enum.Font.Code
 subtitle.TextSize = 10
@@ -731,10 +741,10 @@ local function isVisible(character, part)
     return result == nil or result.Instance:IsDescendantOf(character)
 end
 
-local function getClosestTarget()
+local function getClosestTarget(maximumFov)
     local mousePosition = UserInputService:GetMouseLocation()
     local closestPart = nil
-    local closestDistance = state.aimFov
+    local closestDistance = maximumFov or state.aimFov
 
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= localPlayer
@@ -898,21 +908,28 @@ end
 
 local weaponRules = {
     noRecoil = {
-        RecoilControl = 0,
+        recoilcontrol = 0,
+        recoil = 0,
     },
     noSpread = {
-        Spread = 0,
-        MaxSpread = 0,
+        spread = 0,
+        maxspread = 0,
     },
     infiniteAmmo = {
-        Ammo = 300,
-        StoredAmmo = 300,
+        ammo = 300,
+        storedammo = 300,
     },
     fastReload = {
-        ReloadTime = 0.1,
+        reloadtime = function(original)
+            if type(original) ~= "number" then
+                return nil
+            end
+            return math.max(original * 0.65, 0.45)
+        end,
     },
     automatic = {
-        Auto = true,
+        auto = true,
+        automatic = true,
     },
 }
 
@@ -947,9 +964,13 @@ local function getWeaponOverride(instance)
     if not instance:IsA("ValueBase") then
         return nil
     end
+    local normalizedName = string.lower(instance.Name)
     for key, rules in pairs(weaponRules) do
-        local newValue = state[key] and rules[instance.Name]
+        local newValue = state[key] and rules[normalizedName]
         if newValue ~= nil then
+            if type(newValue) == "function" then
+                return newValue(weaponOriginals[instance] or instance.Value)
+            end
             return newValue
         end
     end
@@ -987,7 +1008,10 @@ local function getWeaponFolder()
         if folder then
             local hasValues = false
             for _, v in pairs(folder:GetDescendants()) do
-                if v:IsA("ValueBase") and (v.Name:find("Recoil") or v.Name:find("Spread") or v.Name:find("Ammo") or v.Name:find("Reload")) then
+                local valueName = string.lower(v.Name)
+                if v:IsA("ValueBase")
+                    and (valueName:find("recoil") or valueName:find("spread")
+                        or valueName:find("ammo") or valueName:find("reload")) then
                     hasValues = true
                     break
                 end
@@ -1059,6 +1083,30 @@ local function restoreHumanoids()
     table.clear(humanoidOriginals)
 end
 
+local function applyNoclip()
+    local character = localPlayer.Character
+    if not character then
+        return
+    end
+    for _, instance in ipairs(character:GetDescendants()) do
+        if instance:IsA("BasePart") then
+            if noclipOriginals[instance] == nil then
+                noclipOriginals[instance] = instance.CanCollide
+            end
+            instance.CanCollide = false
+        end
+    end
+end
+
+local function restoreNoclip()
+    for instance, original in pairs(noclipOriginals) do
+        if instance and instance.Parent then
+            instance.CanCollide = original
+        end
+    end
+    table.clear(noclipOriginals)
+end
+
 local cleanup
 cleanup = function()
     if destroyed then
@@ -1069,6 +1117,7 @@ cleanup = function()
     clearEsp()
     restoreWeaponMods()
     restoreHumanoids()
+    restoreNoclip()
     state.fullBright = false
     applyFullBright()
     for _, connection in ipairs(connections) do
@@ -1094,7 +1143,7 @@ addSection(aimPage, "Assistencia de mira")
 addToggle(aimPage, "Aim Assist", "Mire no alvo mais proximo dentro do FOV", "aimEnabled")
 addToggle(aimPage, "Segurar botao direito", "Ativa a mira somente enquanto estiver pressionado", "aimOnRightMouse")
 addSlider(aimPage, "FOV", "aimFov", 40, 400, 5, "px")
-addSlider(aimPage, "Suavidade", "aimSmoothness", 2, 30, 1, "")
+addSlider(aimPage, "Suavidade (1 = mais forte)", "aimSmoothness", 1, 20, 1, "")
 addCycle(aimPage, "Parte do corpo", "aimPart", {"Head", "UpperTorso", "HumanoidRootPart"})
 addToggle(aimPage, "Checar equipe", nil, "teamCheck", updateEsp)
 addToggle(aimPage, "Checar paredes", nil, "wallCheck")
@@ -1145,7 +1194,11 @@ addToggle(playerPage, "Velocidade personalizada", "Restaura o valor original ao 
 end)
 addSlider(playerPage, "WalkSpeed", "walkSpeed", 16, 80, 2, "")
 addToggle(playerPage, "Pulo infinito", nil, "infiniteJump")
-addToggle(playerPage, "Noclip", "Atravessa paredes", "noclip")
+addToggle(playerPage, "Noclip", "Atravessa paredes e restaura colisoes ao desligar", "noclip", function(enabled)
+    if not enabled then
+        restoreNoclip()
+    end
+end)
 addToggle(playerPage, "Trigger Bot", "Atira automaticamente quando o inimigo esta na mira", "triggerBot")
 
 local configPage = createTab("CONFIG", 5)
@@ -1300,6 +1353,72 @@ local fpsFrames = 0
 local fpsElapsed = 0
 local espElapsed = 0
 local aimElapsed = 0
+local triggerElapsed = 0
+local lastTriggerShot = 0
+
+local function fireMouseOnce()
+    local now = os.clock()
+    if now - lastTriggerShot < 0.11 then
+        return
+    end
+    lastTriggerShot = now
+    if type(mouse1click) == "function" then
+        pcall(mouse1click)
+    elseif type(mouse1press) == "function" and type(mouse1release) == "function" then
+        pcall(mouse1press)
+        task.delay(0.025, function()
+            pcall(mouse1release)
+        end)
+    elseif VirtualInputManager then
+        local position = UserInputService:GetMouseLocation()
+        pcall(function()
+            VirtualInputManager:SendMouseButtonEvent(position.X, position.Y, 0, true, game, 0)
+        end)
+        task.delay(0.025, function()
+            pcall(function()
+                VirtualInputManager:SendMouseButtonEvent(position.X, position.Y, 0, false, game, 0)
+            end)
+        end)
+    end
+end
+
+local noclipElapsed = 0
+connect(RunService.Heartbeat, function(deltaTime)
+    if destroyed then
+        return
+    end
+
+    if state.speedEnabled then
+        local character = localPlayer.Character
+        local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+        local root = character and character:FindFirstChild("HumanoidRootPart")
+        if humanoid then
+            if humanoidOriginals[humanoid] == nil then
+                humanoidOriginals[humanoid] = humanoid.WalkSpeed
+            end
+            humanoid.WalkSpeed = state.walkSpeed
+
+            if root and humanoid.MoveDirection.Magnitude > 0.05 and state.walkSpeed > 16 then
+                local velocity = root.AssemblyLinearVelocity
+                local horizontalSpeed = Vector3.new(velocity.X, 0, velocity.Z).Magnitude
+                if horizontalSpeed < state.walkSpeed * 0.6 then
+                    local extraDistance = (state.walkSpeed - 16) * deltaTime
+                    root.CFrame = root.CFrame + (humanoid.MoveDirection * extraDistance)
+                end
+            end
+        end
+    end
+
+    if state.noclip then
+        noclipElapsed = noclipElapsed + deltaTime
+        if noclipElapsed >= 0.1 then
+            noclipElapsed = 0
+            applyNoclip()
+        end
+    else
+        noclipElapsed = 0
+    end
+end)
 
 connect(RunService.RenderStepped, function(deltaTime)
     if destroyed or not camera then
@@ -1310,6 +1429,7 @@ connect(RunService.RenderStepped, function(deltaTime)
     fpsElapsed = fpsElapsed + deltaTime
     espElapsed = espElapsed + deltaTime
     aimElapsed = aimElapsed + deltaTime
+    triggerElapsed = triggerElapsed + deltaTime
     local mousePosition = UserInputService:GetMouseLocation()
     local showFov = state.showFov and state.aimEnabled
     fovCircle.Visible = showFov
@@ -1334,8 +1454,7 @@ connect(RunService.RenderStepped, function(deltaTime)
         end
         if currentTarget then
             local goal = CFrame.lookAt(camera.CFrame.Position, currentTarget.Position)
-            -- Invertido: suavidade baixa = aim forte, suavidade alta = aim suave
-            local strength = (31 - state.aimSmoothness) * 1.8
+            local strength = ((21 - state.aimSmoothness) * 3.5) + 2
             local alpha = 1 - math.exp(-strength * deltaTime)
             camera.CFrame = camera.CFrame:Lerp(goal, alpha)
         end
@@ -1344,35 +1463,20 @@ connect(RunService.RenderStepped, function(deltaTime)
         aimElapsed = 0
     end
 
-    if state.speedEnabled then
-        local humanoid = localPlayer.Character
-            and localPlayer.Character:FindFirstChildOfClass("Humanoid")
-        if humanoid then
-            if humanoidOriginals[humanoid] == nil then
-                humanoidOriginals[humanoid] = humanoid.WalkSpeed
-            end
-            if humanoid.WalkSpeed ~= state.walkSpeed then
-                humanoid.WalkSpeed = state.walkSpeed
-            end
-        end
-    end
-
-    if state.noclip and localPlayer.Character then
-        for _, v in pairs(localPlayer.Character:GetDescendants()) do
-            if v:IsA("BasePart") then v.CanCollide = false end
-        end
-    end
-
-    if state.triggerBot and currentTarget then
-        local sp, vis = camera:WorldToViewportPoint(currentTarget.Position)
-        if vis then
-            local dist = (UserInputService:GetMouseLocation() - Vector2.new(sp.X, sp.Y)).Magnitude
-            if dist < 20 then
-                pcall(function() mouse1press() end)
-                task.wait(0.03)
-                pcall(function() mouse1release() end)
+    if state.triggerBot and triggerElapsed >= 0.05 then
+        triggerElapsed = 0
+        local triggerTarget = currentTarget or getClosestTarget(20)
+        if triggerTarget then
+            local sp, vis = camera:WorldToViewportPoint(triggerTarget.Position)
+            if vis then
+                local dist = (mousePosition - Vector2.new(sp.X, sp.Y)).Magnitude
+                if dist < 20 then
+                    fireMouseOnce()
+                end
             end
         end
+    elseif not state.triggerBot then
+        triggerElapsed = 0
     end
 
     if espElapsed >= 0.2 then
@@ -1400,4 +1504,4 @@ elseif canUseFiles() then
 else
     setStatus("Config local indisponivel neste executor", colors.enemy)
 end
-print("B arney HUB | Arsenal v4 loaded")
+print("B arney HUB | Arsenal v5 loaded")
